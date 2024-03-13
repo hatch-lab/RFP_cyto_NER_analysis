@@ -1,0 +1,158 @@
+---
+title: Morphology Statistical Analysis
+author: AG
+date: updated 051023
+output: pdf_document
+---
+
+```{r, warning = FALSE, message = FALSE, error = FALSE}
+library(tidyverse)
+library(kableExtra)
+library(ggbeeswarm)
+```
+
+# Import Results
+
+```{r, warning = FALSE, message = FALSE, error = FALSE}
+data <- as_tibble(read.csv("Exported_Data/Ratio_Final.csv")) %>%
+     reframe(siRNA, Nuc_Area, Nuc_ConvexArea, Nuc_Eccentricity, Nuc_Solidity) %>%
+     group_by(siRNA) %>%
+     mutate("med_Area" = median(Nuc_Area),
+          "med_ConvexArea" = median(Nuc_ConvexArea),
+          "med_Eccentricity" = median(Nuc_Eccentricity),
+          "med_Solidity" = median(Nuc_Solidity))
+          
+```
+
+# Calculate statistics
+
+For this, I am going to compare each siRNA with the CTRL using the Kolmogorov-Smirnov test and a Bonferroni adjustment.
+
+```{r, warning = FALSE, message = FALSE, error = FALSE}
+CTRL <- data %>% 
+     filter(siRNA == "CTRL") 
+m <- nrow(data %>% reframe(siRNA)%>% unique())
+stats <- data %>%
+    na.omit() %>%
+    group_by(siRNA) %>%
+    reframe(siRNA,
+         "Area_p_value" = (ks.test(CTRL$Nuc_Area, Nuc_Area)$p.value)*m,
+         "Eccentricity_p_value" = (ks.test(CTRL$Nuc_Eccentricity, Nuc_Eccentricity)$p.value)*m,
+         "Solidity_p_value" = (ks.test(CTRL$Nuc_Solidity, Nuc_Solidity)$p.value)*m,
+         "Convex_p_value" = (ks.test(CTRL$Nuc_ConvexArea, Nuc_ConvexArea)$p.value)*m) %>%
+     unique() 
+
+final <- left_join(data, stats)
+final %>% write.csv("filepath/morphology_stats.csv")
+```
+
+# Tables for significant values
+
+```{r, warning = FALSE, message = FALSE, error = FALSE}
+area <- final %>%
+     reframe(siRNA, "median_area" = med_Area, Area_p_value) %>%
+     unique() %>%
+     filter(Area_p_value <= 0.05) %>%
+     reframe(siRNA, median_area, "pvalue" = format(Area_p_value, scientific = TRUE, digits = 3))
+
+area %>% 
+     kbl() %>%
+     kable_paper("hover", full_width = F)
+
+
+solidity <- final %>%
+     reframe(siRNA, "median_solidity" = med_Solidity, Solidity_p_value) %>%
+     unique() %>%
+     filter(Solidity_p_value <= 0.05) %>%
+     reframe(siRNA, median_solidity, "pvalue" = format(Solidity_p_value, scientific = TRUE, digits = 3))
+
+solidity %>% 
+     kbl() %>%
+     kable_paper("hover", full_width = F)
+
+eccentricity <- final %>%
+     reframe(siRNA, "median_eccentricity" = med_Eccentricity, Eccentricity_p_value) %>%
+     unique() %>%
+     filter(Eccentricity_p_value <= 0.05) %>%
+     reframe(siRNA, median_eccentricity, "pvalue" = format(Eccentricity_p_value, scientific = TRUE, digits = 3)) 
+
+eccentricity %>% 
+     kbl() %>%
+     kable_paper("hover", full_width = F)
+
+```
+
+Because there are so many significant diversions from CTRL, I'm going to proceed with the min/max five for each.
+
+```{r, warning = FALSE, message = FALSE, error = FALSE}
+label_low_eccentricity <- left_join(
+     eccentricity %>%
+     filter(siRNA != "PSMC1") %>%
+     reframe(siRNA, median_eccentricity, pvalue) %>%
+     unique() %>%
+     arrange(median_eccentricity) %>%
+     slice_head(n = 5) %>%
+     mutate("cat" = "low_eccentricity"),
+     final)
+
+label_hi_eccentricity <- left_join(
+     eccentricity %>%
+     filter(siRNA != "PSMC1") %>%
+     reframe(siRNA, median_eccentricity, pvalue) %>%
+     unique() %>%
+     arrange(median_eccentricity) %>%
+     slice_tail(n = 5) %>%
+     mutate("cat" = "low_eccentricity"),
+     final)
+
+label_low_area <- left_join(
+     area %>%
+     filter(siRNA != "PSMC1") %>%
+     reframe(siRNA, median_area, pvalue) %>%
+     unique() %>%
+     arrange(median_area) %>%
+     slice_head(n = 5) %>%
+     mutate("cat" = "low_area"),
+     final)
+
+label_hi_area <- left_join(
+     area %>%
+     filter(siRNA != "PSMC1") %>%
+     reframe(siRNA, median_area, pvalue) %>%
+     unique() %>%
+     arrange(median_area) %>%
+     slice_tail(n = 5) %>%
+     mutate("cat" = "low_area"),
+     final)
+
+label_low_solidity <- left_join(
+     solidity %>%
+     filter(siRNA != "PSMC1") %>%
+     reframe(siRNA, median_solidity, pvalue) %>%
+     unique() %>%
+     arrange(median_solidity) %>%
+     slice_head(n = 5) %>%
+     mutate("cat" = "low_solidity"),
+     final)
+
+label_hi_solidity <- left_join(
+     solidity %>%
+     filter(siRNA != "PSMC1") %>%
+     reframe(siRNA, median_solidity, pvalue) %>%
+     unique() %>%
+     arrange(median_solidity) %>%
+     slice_tail(n = 5) %>%
+     mutate("cat" = "low_solidity"),
+     final)
+
+morph <- bind_rows(
+     label_low_eccentricity,
+     label_hi_eccentricity,
+     label_low_area,
+     label_hi_area,
+     label_low_solidity,
+     label_hi_solidity
+) 
+
+morph %>% write.csv("filepath/morphology_stats_hits.csv")
+```

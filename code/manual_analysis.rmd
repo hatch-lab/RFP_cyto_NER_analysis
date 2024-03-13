@@ -1,0 +1,124 @@
+---
+title: Manual Analysis
+author: AG
+date: 051023
+output: pdf_document
+---
+
+# Objectives
+
+Manually assess the extremes for values of interest: Area, Solidity, Rupture Frequency, plus CTRL and LMNB1 for each plate. 
+
+# Methods
+
+Based on the Solidity vs Area results, I was able to select the three most extreme values for each of Area, Solidity, and Rupture Frequency. The goal is to analyze one well per plate from each, preferably the most extreme. 
+
+# Analysis
+ 
+Manually assessed stage 14 (randomly chosen) of the images for accurate rupture calls.
+
+Create a spreadsheet on which to track results.
+
+```{r,  warning = FALSE, message = FALSE, error = FALSE}
+library(tidyverse)
+library(kableExtra)
+
+stages <- bind_rows(
+     read.csv("raw_data/030923_DNA_Final1.csv", skip = 1) %>%
+     mutate("Experiment" = "raw_data/030923_DNA_Final1.csv"),
+     read.csv("raw_data/031623_DNA_Final1.csv", skip = 1) %>%
+     mutate("Experiment" = "raw_data/031623_DNA_Final1.csv"),
+     read.csv("raw_data/032323_DNA_Final1.csv", skip = 1) %>%
+     mutate("Experiment" = "raw_data/032323_DNA_Final1.csv"),
+     read.csv("raw_data/041323_DNA_Final1.csv", skip = 1) %>%
+     mutate("Experiment" = "raw_data/032323_DNA_Final1.csv")) %>%
+     reframe(Experiment, Metadata_Well, ImageNumber, ObjectNumber, Metadata_Site)
+
+data <- read.csv("Exported_Data/Ratio_Final.csv")
+
+manual <- left_join(data, stages) %>%
+     filter(grepl('RASA1|CTDNEP1|POMGNT2|TEN1|LY9|CTRL|LMNB1', siRNA)) %>%
+     filter(!grepl('H01|E01', Metadata_Well)) %>%
+     filter(Metadata_Site == 14) %>%
+     reframe(Experiment, Metadata_Well, ObjectNumber, Metadata_Site, ruptured)
+
+#manual %>% write.csv("filepath/extremes_manual.csv")
+```
+
+The nuclei in the manual annotation list will be assessed for rupture status and segmentation.
+
+Rupture status:
+colname manual - y = ruptured, n = intact
+
+Segmentation:
+colname segmentation - g = good, o = over segmented, u = under segmented, e = nuclei cut off on edge
+
+After manual assessment the .csv is resaved as completed.
+
+__Precision/Recall/FDR for rupture calls__
+
+```{r,  warning = FALSE, message = FALSE, error = FALSE}
+p_r <- read.csv("processed_data/extremes_manual_completed.csv")%>%
+     mutate("p_r" = case_when(
+          ruptured == "y" & manual == "y" ~ "true_pos",
+          ruptured == "y" & manual == "n" ~ "false_pos",
+          ruptured == "n" & manual == "y" ~ "false_neg",
+          ruptured == "n" & manual == "n" ~ "true_neg"
+     )) 
+
+predict_positive <- p_r %>%
+     filter(ruptured == "y") %>%
+     count()
+
+predict_negative <- p_r %>%
+     filter(ruptured == "n") %>%
+     count()
+
+true_pos <- p_r %>%
+     filter(p_r == "true_pos") %>%
+     count()
+
+false_pos <- p_r %>%
+     filter(p_r == "false_pos") %>%
+     count()
+
+false_neg <- p_r %>%
+     filter(p_r == "false_neg") %>%
+     count()
+
+true_neg <- p_r %>%
+     filter(p_r == "true_neg") %>%
+     count()
+
+
+false_discovery_rate <- false_pos$n/predict_positive$n
+
+negative_predictive_value <- true_neg$n/predict_negative$n
+
+precision <- true_pos$n/(true_pos$n + false_pos$n)
+
+recall <- true_pos$n/(true_pos$n + false_neg$n)
+
+data.frame("total" = (true_pos + true_neg), precision, recall, false_discovery_rate) %>%
+     kbl() %>%
+     kable_paper("hover", full_width = F)
+```
+
+_Precision/Recall for nucleus segmentation_
+
+```{r,  warning = FALSE, message = FALSE, error = FALSE}
+
+good <- p_r %>% filter(segmentation == "g") %>% count() 
+
+edge <- p_r %>% filter(segmentation == "e") %>% count() 
+
+under <- p_r %>% filter(segmentation == "u") %>% count() 
+
+over <- p_r %>% filter(segmentation == "o") %>% count()
+
+total <- p_r %>% count() 
+
+data.frame(total$n, "good" = good$n/total$n, "edge" = edge$n/total$n, "under" = under$n/total$n, "over" = over$n/total$n) %>%
+     kbl() %>%
+     kable_paper("hover", full_width = F)
+```

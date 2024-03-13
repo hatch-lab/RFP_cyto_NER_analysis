@@ -1,0 +1,461 @@
+---
+title: Setting Filters
+author: AG
+date: 051023
+output: pdf_document
+---
+
+## Objective
+
+Setting filters for RFPcyto screen objects identified by cellprofiler.
+
+## Methods
+
+### __Compile cellprofiler spreadsheets__
+
+The only space that needs to be modified for the screen is the addition of filepaths for each cellprofiler output after "files", and ensuring the siRNA variable directs to the appropriate filepath. 
+
+This section will process and compile the files, join the siRNA based on the HatchScreen2 metadata, remove stages with greater than 50 cells (de-clumping), and group by Experiment and siRNA. There is an additional grepl() for the validation controls to limit the amount of data being processed while setting filters that can be adjusted as needed.
+
+```{r, warning = FALSE, message = FALSE, error = FALSE}
+library(tidyverse)
+
+files <- c( 
+     "raw_data/030923_DNA_Final1.csv",
+     "raw_data/031623_DNA_Final1.csv",
+     "raw_data/032323_DNA_Final1.csv",
+     "raw_data/041323_DNA_Final1.csv"
+     )
+
+siRNA <- as_tibble(read.csv("/raw_data/HatchScreen2.csv")) %>%
+    summarize(siRNA, Metadata_Well)
+
+process_file <- function(files) {
+     right_join(siRNA,
+    as_tibble(read.csv(files, skip = 1)) %>%
+    filter(!grepl('s31|s32|s33|s34|s35|s36', FileName_DNA)) %>%
+    summarize("Experiment" = files, 
+    "Metadata_Well" = as.character(Metadata_Well), 
+    ImageNumber, 
+    ObjectNumber, 
+    "Cyto_Area" = AreaShape_Area.1,
+    "Cyto_DAPI" = Intensity_MeanIntensity_CorrDAPI.1,
+    "Cyto_GFP" = Intensity_MeanIntensity_CorrGFP.1,
+    "Cyto_RFP" = Intensity_MeanIntensity_CorrRFP.1,
+    "Nuc_Area" = AreaShape_Area,
+    "Nuc_Orientation" = AreaShape_Orientation,
+    "Nuc_ConvexArea" = AreaShape_ConvexArea,
+    "Nuc_Eccentricity" = AreaShape_Eccentricity,
+    "Nuc_Solidity" = AreaShape_Solidity,
+    "Nuc_DAPI" = Intensity_MeanIntensity_CorrDAPI,
+    "Nuc_GFP" = Intensity_MeanIntensity_CorrGFP,
+    "Nuc_RFP" = Intensity_MeanIntensity_CorrRFP) %>%
+    group_by(Experiment, Metadata_Well) %>%
+    na.omit() %>%
+    mutate(
+       "med_Cyto_Area" = median(Cyto_Area),
+        "med_Cyto_DAPI" = median(Cyto_DAPI),
+        "med_Cyto_GFP" = median(Cyto_GFP),
+        "med_Cyto_RFP" = median(Cyto_RFP),
+        "med_Nuc_Area" = median(Nuc_Area),
+          "med_Nuc_Orientation" = median(Nuc_Orientation),
+          "med_Nuc_ConvexArea" = median(Nuc_ConvexArea),
+          "med_Nuc_Eccentricity" = median(Nuc_Eccentricity),
+        "med_Nuc_Solidity" = median(Nuc_Solidity),
+        "med_Nuc_DAPI" = median(Nuc_DAPI),
+        "med_Nuc_GFP" = median(Nuc_GFP),
+        "med_Nuc_RFP" = median(Nuc_RFP),
+        "sd_Cyto_Area" = sd(Cyto_Area),
+        "sd_Cyto_DAPI" = sd(Cyto_DAPI),
+        "sd_Cyto_GFP" = sd(Cyto_GFP),
+        "sd_Cyto_RFP" = sd(Cyto_RFP),
+        "sd_Nuc_Area" = sd(Nuc_Area),
+          "sd_Nuc_Orientation" = sd(Nuc_Orientation),
+          "sd_Nuc_ConvexArea" = sd(Nuc_ConvexArea),
+          "sd_Nuc_Eccentricity" = sd(Nuc_Eccentricity),
+        "sd_Nuc_Solidity" = sd(Nuc_Solidity),
+        "sd_Nuc_DAPI" = sd(Nuc_DAPI),
+        "sd_Nuc_GFP" = sd(Nuc_GFP),
+        "sd_Nuc_RFP" = sd(Nuc_RFP)
+    ) %>%
+     mutate("Ratio_RFP" = Nuc_RFP/Cyto_RFP,
+          "Ratio_GFP" = Cyto_GFP/Nuc_GFP) %>%
+     mutate("median_R" = median(Ratio_RFP),
+          "sd_R" = sd(Ratio_RFP),
+          "median_G" = median(Ratio_GFP),
+          "sd_G" = sd(Ratio_GFP))
+     )
+}
+
+df <- purrr::map_dfr(files, process_file)
+
+final <- left_join(df %>%     
+     group_by(Experiment, ImageNumber) %>%
+     count() %>%
+     filter(n >= 1,
+          n <= 50) %>%
+     mutate('stage_filter' = '1_50'),
+     df) %>%
+    filter(siRNA != 'NA') %>%
+    group_by(Experiment, siRNA) %>%
+    filter(grepl('CTRL|LMNB1|SUN1|LMNA|BANF1', siRNA))
+
+```
+
+### __Step2. Check the focus by looking at the Ratio_RFP for each of the controls__
+
+The HatchScreen2 plate has a CTRL well at the beginning, middle, and end of the plate. If everything is reasonably well focused, there should be agreement between these wells.
+
+```{r, warning = FALSE, message = FALSE, error = FALSE}
+dfCTRL <- final %>%
+     filter(grepl('CTRL', siRNA)) %>%
+     group_by(Experiment, Metadata_Well)
+
+ggplot() +
+     geom_jitter(data = dfCTRL, 
+          aes(x = Ratio_RFP, y = Metadata_Well,
+          color = Metadata_Well), 
+          alpha = 0.2) +
+          xlim(0,6) +
+          theme_classic() +
+          facet_grid(Experiment~.) +
+          scale_color_manual(values = c('#102343', '#78BA39', '#931491'))
+#ggsave("filepath/CTRL_Compare.png")
+```
+
+### __Step 3. Develop intensity filters by looking at plate-wide values__
+
+For each of the filters below, some minor adjustments may be necessary based on the relative intensity of the experiment.
+
+__Nuc_RFP__ 
+Nucleus RFP filters should only be used if there is an issue with out of focus and/or dead cells.
+
+```{r, warning = FALSE, message = FALSE, error = FALSE}
+unfiltered <- final %>%
+     mutate('filter' = 'unfiltered')
+
+Nuc_RFP_filter <- final %>%
+     ungroup() %>%
+     group_by(Experiment) %>%
+     filter(
+          Nuc_RFP <= 0.05
+          ) %>%
+     mutate('filter' = 'Nuc_RFP')
+
+Nuc_RFP <- rbind(unfiltered, Nuc_RFP_filter)
+
+ggplot() +
+     geom_jitter(data = Nuc_RFP, 
+          aes(x = Nuc_RFP, y = filter,
+          color = Experiment), 
+          alpha = 0.2) +
+          theme_classic() +
+          facet_grid(siRNA~.) +
+          theme(legend.position = "none") +
+          scale_color_manual(values = c('#102343', '#78BA39', '#931491', '#523323'))
+     #ggsave("filepath/NucRFP.png")
+```
+
+__Cyto_RFP__
+
+If there are individual wells with poor focus or photobleaching, the Cyto_RFP filter can be helpful in removing affected objects.
+
+```{r, warning = FALSE, message = FALSE, error = FALSE}
+
+Cyto_RFP_filter <- Nuc_RFP_filter %>%
+     group_by(Experiment) %>%
+     filter(
+         Cyto_RFP <= (med_Cyto_RFP + (4*sd_Cyto_RFP)),
+         Cyto_RFP >= (0.0001)
+     ) %>%
+     mutate(filter = replace(filter, filter == 'Nuc_RFP', 'Cyto_RFP'))
+
+Cyto_RFP <- rbind(unfiltered, Cyto_RFP_filter)
+
+ggplot() +
+     geom_jitter(data = Cyto_RFP, 
+          aes(x = Cyto_RFP, y = filter,
+          color = Experiment), 
+          alpha = 0.2) +
+          theme_classic() +
+          facet_grid(siRNA~.) +
+          theme(legend.position = "none") +
+          scale_color_manual(values = c('#102343', '#78BA39', '#931491', '#523323'))
+     #ggsave("filepath/CytoRFP.png")
+```
+
+__Nuc_DAPI__
+
+Nuc_DAPI evaluates the DNA channel, and can also be adjusted to remove out of focus cells.
+
+```{r, warning = FALSE, message = FALSE, error = FALSE}
+Nuc_DAPI_filter <- Cyto_RFP_filter %>%
+     group_by(Experiment) %>%
+     filter(
+         Nuc_DAPI <= (med_Nuc_DAPI + 3*sd_Nuc_DAPI),
+         Nuc_DAPI >= (med_Nuc_DAPI - 1.5*sd_Nuc_DAPI)
+     ) %>%
+     mutate(filter = replace(filter, filter == 'Cyto_RFP', 'Nuc_DAPI'))
+
+Nuc_DAPI <- rbind(unfiltered, Nuc_DAPI_filter)
+
+ggplot() +
+     geom_jitter(data = Nuc_DAPI, 
+          aes(x = Nuc_DAPI, y = filter,
+          color = Experiment), 
+          alpha = 0.2) +
+          theme_classic() +
+          facet_grid(siRNA~.) +
+          theme(legend.position = "none") +
+          scale_color_manual(values = c('#102343', '#78BA39', '#931491', '#523323'))
+     #ggsave("filepath/NucDAPI.png")
+```
+
+__Nuc_GFP__
+
+Nuc_GFP should be kept relatively loose because the Nuc_GFP levels will be affected by rupture frequency. However, a hard lower limit above 0 can filter out nuclei without GFPnls signal.
+
+```{r, warning = FALSE, message = FALSE, error = FALSE}
+Nuc_GFP_filter <- Nuc_DAPI_filter %>%
+     group_by(Experiment) %>%
+     filter(
+         #Nuc_GFP <= (med_Nuc_GFP + 2*sd_Nuc_GFP),
+         Nuc_GFP >= (0.0005)
+     ) %>%
+     mutate(filter = replace(filter, filter == 'Nuc_DAPI', 'Nuc_GFP'))
+
+Nuc_GFP <- rbind(unfiltered, Nuc_GFP_filter)
+
+ggplot() +
+     geom_jitter(data = Nuc_GFP, 
+          aes(x = Nuc_GFP, y = filter,
+          color = Experiment), 
+          alpha = 0.2) +
+          theme_classic() +
+          facet_grid(siRNA~.) +
+          theme(legend.position = "none") +
+          scale_color_manual(values = c('#102343', '#78BA39', '#931491', '#523323'))
+     #ggsave("filepath/NucGFP.png")
+```
+
+### __Step 3. Develop morphology filters by looking at well-specific values__
+
+For each of the filters below, minor adjustments may be necessary based on how the cells are disperesed and segmented for each experiment. Typically, these filters are left the same through out biological repeats. It is important that these filters are based on individual condition (well) to avoid selecting out cells based on condition-specific morphological changes.
+
+__ConvexArea__
+
+The convex area filter can help remove nuclei on the edge of a field of view, and objects that have segmented multiple nuclei.
+
+```{r, warning = FALSE, message = FALSE, error = FALSE}
+Nuc_ConvexArea_filter <- Nuc_GFP_filter %>%
+     group_by(Experiment, siRNA) %>%
+     filter(
+         Nuc_ConvexArea <= (med_Nuc_ConvexArea + (3*sd_Nuc_ConvexArea)),
+         Nuc_ConvexArea >= (100) 
+     ) %>%
+     mutate(filter = replace(filter, filter == 'Nuc_GFP', 'Nuc_ConvexArea'))
+
+Nuc_ConvexArea <- rbind(unfiltered, Nuc_ConvexArea_filter)
+
+ggplot() +
+     geom_jitter(data = Nuc_ConvexArea, 
+          aes(x = Nuc_ConvexArea, y = filter,
+          color = Experiment), 
+          alpha = 0.2) +
+          theme_classic() +
+          facet_grid(siRNA~.) +
+          theme(legend.position = "none") +
+          scale_color_manual(values = c('#102343', '#78BA39', '#931491', '#523323'))
+     #ggsave("filepath/ConvexArea.png")
+```
+
+__Nuc_Area__
+
+This filter can assist in removing objects that have segmented multiple nuclei.
+
+```{r, warning = FALSE, message = FALSE, error = FALSE}
+Nuc_Area_filter <- Nuc_ConvexArea_filter %>%
+     group_by(Experiment, siRNA) %>%
+     filter(
+         Nuc_Area <= (med_Nuc_Area + (2*sd_Nuc_Area)),
+         Nuc_Area >= (med_Nuc_Area - (2*sd_Nuc_Area))
+     ) %>%
+     mutate(filter = replace(filter, filter == 'Nuc_ConvexArea', 'Nuc_Area'))
+
+Nuc_Area <- rbind(unfiltered, Nuc_Area_filter)
+
+ggplot() +
+     geom_jitter(data = Nuc_Area, 
+          aes(x = Nuc_Area, y = filter,
+          color = Experiment), 
+          alpha = 0.2) +
+          theme_classic() +
+          facet_grid(siRNA~.) +
+          theme(legend.position = "none") +
+          scale_color_manual(values = c('#102343', '#78BA39', '#931491', '#523323'))
+     #ggsave("filepath/NucArea.png")
+```
+
+__Cyto_Area__
+
+This filter can remove objects where multiple cytoplasms have been segmented together, along with removing objects where the RFP was too low to segment a cytoplasm.
+
+```{r, warning = FALSE, message = FALSE, error = FALSE}
+
+Cyto_Area_filter <- Nuc_Area_filter %>%
+     group_by(Experiment, siRNA) %>%
+     filter(
+         Cyto_Area <= (med_Cyto_Area + (3*sd_Cyto_Area)),
+         Cyto_Area >= (500)
+     ) %>%
+     mutate(filter = replace(filter, filter == 'Nuc_Area', 'Cyto_Area'))
+
+Cyto_Area <- rbind(unfiltered, Cyto_Area_filter)
+
+ggplot() +
+     geom_jitter(data = Cyto_Area, 
+          aes(x = Cyto_Area, y = filter,
+          color = Experiment), 
+          alpha = 0.2) +
+          theme_classic() +
+          facet_grid(siRNA~.) +
+          theme(legend.position = "none") +
+          scale_color_manual(values = c('#102343', '#78BA39', '#931491', '#523323'))
+     #ggsave("filepath/CytoArea.png")
+```
+
+__Step 4. Check the CTRL wells on the filtered dataset__
+
+```{r, warning = FALSE, message = FALSE, error = FALSE}
+library(ggridges)
+
+dfCTRL <- Cyto_Area_filter %>%
+     filter(grepl('CTRL', siRNA)) %>%
+     group_by(Experiment, Metadata_Well)
+
+ggplot() +
+     geom_jitter(data = dfCTRL, 
+          aes(x = Ratio_RFP, y = Metadata_Well,
+          color = Experiment), 
+          alpha = 0.2) +
+          theme_classic() +
+          facet_grid(siRNA~.) +
+          theme(legend.position = "none") +
+          scale_color_manual(values = c('#102343', '#78BA39', '#931491', '#523323'))
+     #ggsave("filepath/CTRL_Filtered.png")
+
+ggplot() +
+     geom_density_ridges(data = Cyto_Area_filter, 
+          aes(x = Ratio_RFP, y = reorder(siRNA, Ratio_RFP),
+          color = siRNA), 
+          alpha = 0.2) +
+          theme_classic() +
+          theme(legend.position = "none") +
+          scale_color_manual(values = c('#102343', '#78BA39', '#931491', '#D00520', '#FF5092'))
+     #ggsave("filepath/Validation_Filtered.png")
+```
+
+__Step 5. Ensure the filters are being applied evenly across wells__
+
+```{r, warning = FALSE, message = FALSE, error = FALSE}
+library(kableExtra)
+no_filter <- final %>%
+     mutate('filter' = 'none')
+
+filtered <- final %>%
+     group_by(Experiment) %>%
+     filter(
+          Nuc_RFP <= 0.05,
+         Cyto_RFP <= (med_Cyto_RFP + (4*sd_Cyto_RFP)),
+         Cyto_RFP >= (0.0001),
+         Nuc_DAPI <= (med_Nuc_DAPI + 3*sd_Nuc_DAPI),
+         Nuc_DAPI >= (med_Nuc_DAPI - 2*sd_Nuc_DAPI),
+         #Nuc_GFP <= (med_Nuc_GFP + 2*sd_Nuc_GFP),
+         Nuc_GFP >= (0.0005)
+     ) %>%
+     group_by(Experiment, siRNA) %>%
+     filter(
+         Nuc_ConvexArea <= (med_Nuc_ConvexArea + (3*sd_Nuc_ConvexArea)),
+         Nuc_ConvexArea >= (100) ,
+         Nuc_Area <= (med_Nuc_Area + (2*sd_Nuc_Area)),
+         Nuc_Area >= (med_Nuc_Area - (2*sd_Nuc_Area)),
+         Cyto_Area <= (med_Cyto_Area + (3*sd_Cyto_Area)),
+         Cyto_Area >= (500)
+     ) %>%
+          mutate('filter' = 'all')
+
+left_join(
+     filtered %>%
+     group_by(siRNA) %>%
+     count() %>%
+     summarize(siRNA, 'filteredn' = n),
+
+     no_filter %>%
+     group_by(siRNA) %>%
+     count()  %>%
+     summarize(siRNA, 'unfilteredn' = n)) %>%
+
+     mutate('remaining' = filteredn/unfilteredn) %>%
+     select(siRNA, remaining) %>%
+
+     kbl() %>%
+     kable_paper("hover", full_width = F)
+
+```
+
+__Determine the total number of cells remaining on the plate post filtration__
+
+```{r, warning = FALSE, message = FALSE, error = FALSE}
+final <- left_join(df %>%     
+     group_by(Experiment, ImageNumber) %>%
+     count() %>%
+     filter(n >= 1,
+          n <= 50) %>%
+     mutate('stage_filter' = '1_50'),
+     df) %>%
+    filter(siRNA != 'NA') 
+
+no_filter <- final %>%
+     mutate('filter' = 'none')
+
+filtered <- final %>%
+     group_by(Experiment) %>%
+     filter(
+          Nuc_RFP <= 0.05,
+         Cyto_RFP <= (med_Cyto_RFP + (4*sd_Cyto_RFP)),
+         Cyto_RFP >= (0.0001),
+         Nuc_DAPI <= (med_Nuc_DAPI + 3*sd_Nuc_DAPI),
+         Nuc_DAPI >= (med_Nuc_DAPI - 2*sd_Nuc_DAPI),
+         #Nuc_GFP <= (med_Nuc_GFP + 2*sd_Nuc_GFP),
+         Nuc_GFP >= (0.0005)
+     ) %>%
+     group_by(Experiment, siRNA) %>%
+     filter(
+         Nuc_ConvexArea <= (med_Nuc_ConvexArea + (3*sd_Nuc_ConvexArea)),
+         Nuc_ConvexArea >= (100) ,
+         Nuc_Area <= (med_Nuc_Area + (2*sd_Nuc_Area)),
+         Nuc_Area >= (med_Nuc_Area - (2*sd_Nuc_Area)),
+         Cyto_Area <= (med_Cyto_Area + (3*sd_Cyto_Area)),
+         Cyto_Area >= (500)
+     ) %>%
+          mutate('filter' = 'all')
+
+
+filteredn <-     filtered %>%
+     ungroup() %>%
+     count() %>%
+     summarize('filteredn' = n)
+
+unfilteredn <-     no_filter %>%
+     ungroup() %>%
+     count()  %>%
+     summarize('unfilteredn' = n)
+
+data.frame(filteredn, unfilteredn) %>%
+     mutate('remaining' = filteredn/unfilteredn) %>%
+     kbl() %>%
+     kable_paper("hover", full_width = F)
+
+```
+
+For quality control, if you are filtering out greater than 60% of cells either the filters are too stringent, or something has gone wrong with the image capture/CellProfiler pipeline.

@@ -1,0 +1,82 @@
+---
+title: Statistical Analysis
+author: AG
+date: updated 051023
+output: pdf_document
+---
+
+```{r, echo = FALSE, warning = FALSE, message = FALSE, error = FALSE}
+library(tidyverse)
+library(kableExtra)
+```
+
+# False Discovery Rate
+
+False discovery rate (FDR) is a statistical concept that refers to the proportion of false positives among all significant results found in a multiple hypothesis testing scenario. 
+
+1. Conduct multiple hypothesis tests and obtain p-values for each test
+
+1. Rank the p-values in ascending order, from smallest to largest
+
+1. Define a threshold or cutoff value (often denoted as q) for determining which p-values are considered statistically significant. This threshold is typically set to control the expected FDR at a certain level, such as 5% or 10%
+
+```FDR <- false_pos$n/predict_positive$n```
+
+Using the Benjamini-Hochberg procedure:
+
+```{r, warning = FALSE, message = FALSE, error = FALSE}
+data <- read.csv("Exported_Data/Frequency_RFP_Pool.csv")
+q <- 0.07
+m <- nrow(data)
+FDR_stats <- data %>% 
+  mutate(rank = rank(p),
+         FDR_adjusted_p = p * m / rank,
+         FDR_adjusted_p = pmin(FDR_adjusted_p, 1),
+         FDR_adjusted_p = ifelse(is.na(FDR_adjusted_p), 1, FDR_adjusted_p),
+         FDR_adjusted_p = pmax(FDR_adjusted_p, FDR_adjusted_p[which(p == min(p))] * q))
+
+```
+
+# Bonferroni
+
+The Bonferroni correction is a method for adjusting p-values for multiple comparisons. The basic idea behind the Bonferroni correction is to control the family-wise error rate (FWER), which is the probability of making at least one false positive error among all the hypothesis tests conducted. To control the FWER, the Bonferroni correction adjusts the significance threshold for each individual hypothesis test by dividing the desired overall significance level (e.g., 0.05) by the total number of tests conducted (m).
+
+1. Conduct multiple hypothesis tests and obtain p-values for each test
+
+1. Calculate the number of tests within the family 
+
+1. Divide the overall desired significance by the total number of tests
+
+```{r, warning = FALSE, message = FALSE, error = FALSE}
+alpha <- 0.05
+m <- nrow(data)
+bonferroni_stats <- data %>% 
+  mutate(bon_adjusted_p = p * m)
+
+bonferroni_stats$bon_adjusted_p <- pmin(bonferroni_stats$bon_adjusted_p, 1)
+
+```
+
+Putting the stats side by side for comparison:
+
+```{r, warning = FALSE, message = FALSE, error = FALSE}
+stats_compare <- left_join(
+     FDR_stats %>%
+          reframe(siRNA, rupture_frequency, p, FDR_adjusted_p),
+     bonferroni_stats %>%
+          reframe(siRNA, rupture_frequency, p, bon_adjusted_p),
+     multiple = "all"
+     ) %>%
+     mutate(
+          "unadjusted" = ifelse(p <= 0.05, "y", "n"),
+          "FDR" = ifelse(FDR_adjusted_p <= 0.05, "y", "n"),
+          "bonf" = ifelse(bon_adjusted_p <= 0.05, "y", "n")
+     ) 
+stats_compare %>% write.csv("filepath/statistics.csv")
+stats_compare %>%
+     reframe(siRNA, rupture_frequency, unadjusted, FDR, bonf) -> stats_compare
+
+stats_compare %>%
+     kbl() %>%
+     kable_paper("hover", full_width = F)
+```

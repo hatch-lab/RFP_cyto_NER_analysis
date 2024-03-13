@@ -1,0 +1,414 @@
+---
+title: Preliminary Plot Options 
+author: AG
+date: updated 051023
+output: pdf_document
+---
+
+## Objective
+
+The goal is to take the output of Export_Data.rmd to create several visualization options and draw preliminary conclusions.
+
+## Import Data
+
+```{r,  warning = FALSE, message = FALSE, error = FALSE}
+library(tidyverse)
+Ratio_Final <- as_tibble(read.csv("Exported_Data/Ratio_Final.csv"))
+Frequency_RFP_Pool <- as_tibble(read.csv("Exported_Data/Frequency_RFP_Pool.csv"))
+Frequency_RFP_N <- as_tibble(read.csv("Exported_Data/Frequency_RFP_N.csv"))
+Frequency_GFP_Pool <- as_tibble(read.csv("Exported_Data/Frequency_GFP_Pool.csv"))
+Frequency_GFP_N <- as_tibble(read.csv("Exported_Data/Frequency_GFP_N.csv"))
+```
+
+## Plots
+
+## Validation Plot
+
+You will want to change the siRNA in the filter to whatever wells you want to see to quickly assess if your experiment worked.
+
+```{r,  warning = FALSE, message = FALSE, error = FALSE}
+library(ggridges)
+
+check <- Ratio_Final %>%
+     filter(grepl('CTRL|LMNA|BANF1|LMNB1|SUN1', siRNA))
+
+check$siRNA <- factor(check$siRNA, levels = c("LMNB1", "BANF1", "CTRL", "LMNA", "SUN1"))
+
+ggplot() +
+     geom_density_ridges(data = check, 
+          aes(y = siRNA,
+          x = Ratio_RFP,
+          color = siRNA,
+          fill = siRNA),
+          alpha = 0.1,
+          jittered_points = TRUE, 
+          point_alpha = 1,
+          point_shape = 21,
+          point_size = 0.2) +
+     scale_fill_brewer(palette = "Set1") +
+     scale_color_brewer(palette = "Pastel1") +
+     theme_classic() + 
+     xlim(0,3) +
+     xlab('nuc:cyto RFP') + 
+     ylab('siRNA') +
+     theme(legend.position = "none") 
+     #ggsave("filepath/validation.png")
+```
+
+## Barplot
+
+```{r,  warning = FALSE, message = FALSE, error = FALSE}
+R_data_pool <- Frequency_RFP_Pool %>%
+     mutate('fill' = case_when(
+          siRNA == 'CTRL' ~ 'a',
+          siRNA == 'SUN1' ~ 'a',
+          siRNA == 'LMNB1' ~ 'a',
+          siRNA == 'LMNA' ~ 'a',
+          siRNA == 'BANF1' ~ 'a'
+     ))
+
+CTRL <- R_data_pool %>% filter(siRNA == 'CTRL') %>% select(rupture_frequency)
+R_barplot <- R_data_pool %>%
+     mutate('fold_change' = (rupture_frequency/CTRL$rupture_frequency))
+R_barplot_N <- Frequency_RFP_N %>%
+     mutate('fold_change' = (rupture_frequency/CTRL$rupture_frequency))
+
+ggplot() +
+     geom_col(data = R_barplot, 
+          aes(x = reorder(siRNA, rupture_frequency), 
+          y = rupture_frequency,
+          fill = fill),
+          alpha = 0.5) +
+     scale_fill_manual(values = c('#000000','#C0BDBE', '#9e0142', '#d53e4f', '#f46d43', '#fdae61', '#fee08b', '#e6f598', '#abdda4', '#3288bd', '#5e4fa2', '#241e8b', '#fcd107')) +
+     theme_classic() +
+     xlab('siRNA') + 
+     ylab('rupture_frequency') +
+     geom_point(data = R_barplot_N,
+          aes(x = siRNA,
+          y = rupture_frequency,
+          color = Experiment,
+          size = total),
+          alpha = 0.4) +
+     scale_color_manual(values = c('#102343', '#78BA39', '#931491', '#523323', '#000000')) +
+     theme(
+          #legend.position = "none", 
+          axis.text.x = 
+               element_text(angle = 90, hjust = 1, size = 5),
+          axis.ticks = element_blank(),
+          axis.line.x = element_blank()) +
+     scale_y_continuous(expand = c(0,0))
+#ggsave("filepath/RFP_barplot.png")
+
+```
+
+### Waterfall Plot
+
+If you want to highlight different data, you can redirect the mutate in the first chunk of code. After the graph is a commented out ggsave that you can adjust if you would like to export this plot individually.
+
+__Loss of compartmentalization by RFP__
+
+
+```{r,  warning = FALSE, message = FALSE, error = FALSE}
+R_data_pool <- Frequency_RFP_Pool %>%
+     mutate('fill' = case_when(
+          siRNA == 'CTRL' ~ 'a',
+          siRNA == 'SUN1' ~ 'a',
+          siRNA == 'LMNB1' ~ 'a',
+          siRNA == 'LMNA' ~ 'a',
+          siRNA == 'BANF1' ~ 'a'
+     ))
+
+CTRL <- R_data_pool %>% filter(siRNA == 'CTRL') %>% select(rupture_frequency)
+R_waterfall <- R_data_pool %>%
+     mutate('fold_change' = (rupture_frequency/CTRL$rupture_frequency))
+R_waterfall_N <- Frequency_RFP_N %>%
+     mutate('fold_change' = (rupture_frequency/CTRL$rupture_frequency))
+
+ggplot() +
+     geom_col(data = R_waterfall, 
+          aes(x = reorder(siRNA, log2(fold_change)), 
+          y = log2(fold_change),
+          fill = fill),
+          alpha = 0.8) +
+     scale_fill_manual(values = c('#000000','#C0BDBE', '#9e0142', '#d53e4f', '#f46d43', '#fdae61', '#fee08b', '#e6f598', '#abdda4', '#3288bd', '#5e4fa2', '#241e8b', '#fcd107')) +
+     theme_classic() +
+     xlab('siRNA') + 
+     ylab('log2(fold change) nuc:cyto RFP') +
+     geom_point(data = R_waterfall_N,
+          aes(x = siRNA,
+          y = log2(fold_change),
+          color = Experiment,
+          size = total),
+          alpha = 0.3) +
+     scale_color_manual(values = c('#102343', '#78BA39', '#931491', '#523323', '#000000')) +
+     theme(
+          legend.position = "none", 
+          axis.text.x = 
+               element_text(angle = 90, hjust = 1, size = 5),
+          axis.ticks = element_blank(),
+          axis.line.x = element_blank()) +
+     scale_y_continuous(expand = c(0,0))
+#ggsave("filepath/RFP_waterfall.png")
+```
+
+__Loss of compartmentalization by GFP normalized to rupture frequency__
+
+
+```{r,  warning = FALSE, message = FALSE, error = FALSE}
+G_data_pool <- Frequency_GFP_Pool %>%
+     mutate('fill' = case_when(
+          siRNA == 'CTRL' ~ 'a',
+          siRNA == 'SUN1' ~ 'a',
+          siRNA == 'LMNB1' ~ 'a',
+          siRNA == 'LMNA' ~ 'a',
+          siRNA == 'BANF1' ~ 'a'
+     ))
+
+CTRL <- G_data_pool %>% filter(siRNA == 'CTRL') %>% select(rupturing_frequency)
+G_waterfall <- G_data_pool %>%
+     mutate('fold_change' = (rupturing_frequency/CTRL$rupturing_frequency))
+G_waterfall_N <- Frequency_GFP_N %>%
+     mutate('fold_change' = (rupturing_frequency/CTRL$rupturing_frequency))
+
+ggplot() +
+     geom_col(data = G_waterfall, 
+          aes(x = reorder(siRNA, fold_change), 
+          y = log2(fold_change),
+          fill = fill, 
+          color = fill),
+          alpha = 0.8) +
+     scale_fill_manual(values = c('#000000','#C0BDBE', '#9e0142', '#d53e4f', '#f46d43', '#fdae61', '#fee08b', '#e6f598', '#abdda4', '#3288bd', '#5e4fa2', '#241e8b', '#fcd107')) +
+     theme_classic() +
+     xlab('siRNA') + 
+     ylab('log2(fold change) cyto:nuc GFP')  +
+     geom_point(data = G_waterfall_N,
+          aes(x = siRNA,
+          y = log2(fold_change),
+          color = Experiment,
+          size = total),
+          alpha = 0.3) +
+     scale_color_manual(values = c('#102343', '#78BA39', '#931491', '#523323', '#000000')) +
+     theme(
+          legend.position = "none", 
+          axis.text.x = 
+               element_text(angle = 90, hjust = 1, size = 5),
+          axis.ticks = element_blank(),
+          axis.line.x = element_blank()) +
+     scale_y_continuous(expand = c(0,0))
+     #ggsave("filepath/GFP_waterfall.png")
+
+```
+__Loss of compartmentalization by GFP normalized to rupture frequency (filtered for total rupturing cells >= 175)__
+
+
+```{r,  warning = FALSE, message = FALSE, error = FALSE}
+G_data_pool <- Frequency_GFP_Pool %>%
+     mutate('fill' = case_when(
+          siRNA == 'CTRL' ~ 'a',
+          siRNA == 'SUN1' ~ 'a',
+          siRNA == 'LMNB1' ~ 'a',
+          siRNA == 'LMNA' ~ 'a',
+          siRNA == 'BANF1' ~ 'a'
+     ))
+
+CTRL <- G_data_pool %>% filter(siRNA == 'CTRL') %>% select(rupturing_frequency)
+G_waterfall <- G_data_pool %>%
+     mutate('fold_change' = (rupturing_frequency/CTRL$rupturing_frequency)) %>%
+     filter(total >= 175) %>%
+     mutate("significant" = case_when(
+          p <= 0.05/94 ~ "s",
+          p > 0.05/94 ~ "ns"
+     ))
+
+G_waterfall %>%
+     reframe(siRNA, total, "GFP positive" = rupturing, "p-value" = p) %>%
+     kbl() %>%
+     kable_paper("hover", full_width = F)
+
+ggplot() +
+     geom_col(data = G_waterfall, 
+          aes(x = reorder(siRNA, fold_change), 
+          y = log2(fold_change),
+          fill = significant, 
+          color = fill),
+          alpha = 0.8) +
+     scale_fill_manual(values = c('#C0BDBE', '#9e0142', '#d53e4f', '#f46d43', '#fdae61', '#fee08b', '#e6f598', '#abdda4', '#3288bd', '#5e4fa2', '#241e8b', '#fcd107')) +
+     theme_classic() +
+     xlab('siRNA') + 
+     ylab('log2(fold change) cyto:nuc GFP')  +
+     scale_color_manual(values = c('#102343', '#78BA39', '#931491', '#523323', '#000000')) +
+     theme(
+          legend.position = "none", 
+          axis.text.x = 
+               element_text(angle = 90, hjust = 1, size = 5),
+          axis.ticks = element_blank(),
+          axis.line.x = element_blank()) +
+     scale_y_continuous(expand = c(0,0))
+     #ggsave("filepath/GFP_total_over_175_color.png")
+
+```
+### Volcano Plot
+
+If you want to highlight different data, you can redirect the mutate in the first chunk of code. After the graph is a commented out ggsave that you can adjust if you would like to export this plot individually.
+
+__Loss of compartmentalization by RFP__
+
+
+```{r,  warning = FALSE, message = FALSE, error = FALSE}
+library(ggrepel)
+
+labels <- R_waterfall %>%
+     filter(grepl('CTRL|LMNA|LMNB1|BANF1|SUN1|CTDNEP1', siRNA))
+
+ggplot() +
+     geom_point(data = R_waterfall, 
+          aes(x = log2(fold_change), 
+          y = -log10(p), 
+          color = fill),
+          alpha = 0.8) +
+     #ylim(0,18) +
+     scale_color_manual(values = c('#000000','#C0BDBE', '#9e0142', '#d53e4f', '#f46d43', '#fdae61', '#fee08b', '#e6f598', '#abdda4', '#3288bd', '#5e4fa2', '#241e8b', '#fcd107')) +
+     theme_classic() +
+     xlab('log2(fold change) nuc:cyto RFP') + 
+     ylab('-log10(p-value)') +
+     theme(
+          legend.position = "none", 
+          axis.text.x = 
+               element_text(angle = 90, hjust = 1, size = 5),
+          axis.ticks = element_blank()) +
+     scale_y_continuous(expand = c(0,0)) +
+       geom_label_repel(data = labels,  
+                   aes(x = log2(fold_change), 
+                    y = -log10(p),
+                    label = siRNA),
+                    nudge_y = 2,
+                   size = 2)
+#ggsave("filepath/RFP_volcano.png")
+
+```
+
+__Loss of compartmentalization by GFP__
+
+
+```{r,  warning = FALSE, message = FALSE, error = FALSE}
+library(ggrepel)
+
+labels <- G_waterfall %>%
+     filter(grepl('CTRL|ATP9A|LMNB1|HDAC3|NDC1|CTDNEP1|BANF1', siRNA))
+
+ggplot() +
+     geom_point(data = G_waterfall, 
+          aes(x = log2(fold_change), 
+          y = -log10(p), 
+          color = fill),
+          alpha = 0.8) +
+     #xlim(-1.5,1.5) +
+     scale_color_manual(values = c('#000000','#C0BDBE', '#9e0142', '#d53e4f', '#f46d43', '#fdae61', '#fee08b', '#e6f598', '#abdda4', '#3288bd', '#5e4fa2', '#241e8b', '#fcd107')) +
+     theme_classic() +
+     xlab('log2(fold change) cyto:nuc GFP') + 
+     ylab('-log10(p-value)') +
+     theme(
+          legend.position = "none", 
+          axis.text.x = 
+               element_text(angle = 90, hjust = 1, size = 5),
+          axis.ticks = element_blank()) +
+     scale_y_continuous(expand = c(0,0)) +
+     #ylim(0,4) +
+       geom_label_repel(data = labels,  
+                   aes(x = log2(fold_change), 
+                    y = -log10(p),
+                    label = siRNA),
+                   nudge_y = 0.5,
+                   size = 2)
+     #ggsave("filepath/GFP_volcano.png")
+
+```
+
+__RFP volcano, labeled by significance (FDR)__
+```{r,  warning = FALSE, message = FALSE, error = FALSE}
+stats_volcano <- left_join(read.csv("data/statistics.csv"), R_waterfall) 
+stats_FDR <- stats_volcano %>% filter(FDR_adjusted_p <= 0.05)
+stats_label_FDR <- stats_volcano %>%
+     filter(grepl("RASA1|NRM|ARID4A|NDC1|LNPK|CTDNEP1|HDAC3|MYCBP2", siRNA))
+
+ggplot() +
+     geom_point(data = stats_volcano, 
+          aes(x = log2(fold_change), 
+          y = -log10(FDR_adjusted_p)),
+          alpha = 0.6) +
+     #ylim(0,18) +
+     geom_point(data = stats_FDR,
+               aes(x = log2(fold_change), 
+          y = -log10(FDR_adjusted_p)), 
+          color = "red") +
+     theme_classic() +
+     xlab('log2(fold change) nuc:cyto RFP') + 
+     ylab('-log10(p-value)') +
+     theme(
+          legend.position = "none") +
+     scale_y_continuous(expand = c(0,0)) +
+       geom_label_repel(data = stats_label_FDR,  
+                   aes(x = log2(fold_change), 
+                    y = -log10(FDR_adjusted_p),
+                    label = siRNA),
+                    nudge_y = 2,
+                   size = 2)
+#ggsave("filepath/RFP_volcano_FDRstats_label.png")
+
+```
+
+__RFP volcano, labeled by significance (Bonferroni)__
+```{r,  warning = FALSE, message = FALSE, error = FALSE}
+stats_bon <- stats_volcano %>% filter(bon_adjusted_p <= 0.05)
+stats_label_bon <- stats_volcano %>%
+     filter(grepl("RASA1|NRM|ARID4A|NDC1|LNPK|CTDNEP1|HDAC3|MYCBP2", siRNA))
+
+ggplot() +
+     geom_point(data = stats_volcano, 
+          aes(x = log2(fold_change), 
+          y = -log10(bon_adjusted_p)),
+          alpha = 0.6) +
+     #ylim(0,18) +
+     geom_point(data = stats_bon,
+               aes(x = log2(fold_change), 
+          y = -log10(bon_adjusted_p)), 
+          color = "red") +
+     theme_classic() +
+     xlab('log2(fold change) nuc:cyto RFP') + 
+     ylab('-log10(p-value)') +
+     theme(
+          legend.position = "none") +
+     scale_y_continuous(expand = c(0,0)) +
+       geom_label_repel(data = stats_label_bon,  
+                   aes(x = log2(fold_change), 
+                    y = -log10(bon_adjusted_p),
+                    label = siRNA),
+                    nudge_y = 2,
+                   size = 2)
+#ggsave("filepath/RFP_volcano_bonstats_label.png")
+
+ggplot() +
+     geom_point(data = stats_volcano, 
+          aes(x = log2(fold_change), 
+          y = -log10(p)),
+          alpha = 0.6) +
+     #ylim(0,18) +
+     geom_point(data = stats_bon,
+               aes(x = log2(fold_change), 
+          y = -log10(p)), 
+          color = "red") +
+     theme_classic() +
+     xlab('log2(fold change) nuc:cyto RFP') + 
+     ylab('-log10(p-value)') +
+     theme(
+          legend.position = "none") +
+     scale_y_continuous(expand = c(0,0)) +
+       geom_label_repel(data = stats_label_bon,  
+                   aes(x = log2(fold_change), 
+                    y = -log10(p),
+                    label = siRNA),
+                    nudge_y = 2,
+                   size = 2)
+#ggsave("filepath/RFP_volcano_bonstats_unadjustedpscale.png")
+
+```

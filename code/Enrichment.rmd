@@ -1,0 +1,208 @@
+---
+title: Hypergeometric Gene Enrichment Analysis
+author: AG
+date: updated 051023
+output: pdf_document
+---
+
+# Objective
+
+Use the Broad Institute Molecular Signatures Database to identify pathways enrichment within the rupture frequency analysis.
+
+# Load Libraries
+
+```{r,  warning = FALSE, message = FALSE, error = FALSE}
+library(tidyverse)
+library(msigdbr)
+library(clusterProfiler)
+library(org.Hs.eg.db)
+library(stringr)
+```
+
+# Import Data
+
+```{r,  warning = FALSE, message = FALSE, error = FALSE}
+stats <- as_tibble(read.csv("processed_data/statistics.csv"))
+
+Frequency_RFP_Pool <- left_join(read.csv("Exported_Data/Frequency_RFP_Pool.csv"), stats)
+
+Frequency_GFP_Pool <- left_join(read.csv("Exported_Data/Frequency_GFP_Pool.csv"), stats)
+
+```
+
+## Load database
+
+C5 = Broad Institute C5:GO
+
+```{r,  warning = FALSE, message = FALSE, error = FALSE}
+C5 <- msigdbr(species = "Homo sapiens", category = "C5")
+
+```
+
+# Prep inputs
+
+For this analysis, we are essentially looking to answer: of our hits are any categories particularly enriched relative to those included in the screen. 
+
+```{r,  warning = FALSE, message = FALSE, error = FALSE}
+signif_RFP_bonf <- Frequency_RFP_Pool %>% filter(bon_adjusted_p <= 0.05)
+
+signif_GFP_bonf <- Frequency_GFP_Pool %>% filter(bon_adjusted_p <= 0.05)
+```
+
+Next we want to pair the screen siRNAs with ENTREZID. We can pull these from org.Hs.eg.db.
+
+```{r,  warning = FALSE, message = FALSE, error = FALSE}
+entrez_RFP <- select(org.Hs.eg.db, keys=Frequency_RFP_Pool$siRNA, columns="ENTREZID", keytype="SYMBOL") %>% reframe("entrez_gene" = as.integer(ENTREZID))
+
+sig_entrez_RFP_bonf <- select(org.Hs.eg.db, keys=signif_RFP_bonf$siRNA, columns="ENTREZID", keytype="SYMBOL") %>% reframe("entrez_gene" = as.integer(ENTREZID))
+
+```
+
+Finally, we want to run this against the info from the Broad database, and join it to the original set of siRNAs so we are only looking or enrichment relative to our starting point.
+
+```{r,  warning = FALSE, message = FALSE, error = FALSE}
+C5.entrez <- left_join(entrez_RFP, C5) %>% reframe(gs_name, entrez_gene)
+
+```
+
+## Hypergeometric Enrichment
+
+ Hypergeometric enrichment is going to look for overlap between the hits and particular categories of genes. Fishers exact test is used to determine the probability that the genes in a gene set arrived by chance. We have defined our greater gene set using the Broad database, defined which genes we determined to be significant, and now the enrichment package is going to calculate the proportion of hit genes in a set, then estimate probability and significance.
+
+```{r,  warning = FALSE, message = FALSE, error = FALSE}
+enrich.C5_RFP_bonf <- enricher(gene = sig_entrez_RFP_bonf$entrez_gene, TERM2GENE = C5.entrez)
+
+```
+
+The results from the enricher are stored in an S4. To simplify subsequent analysis, we can pull them using the following code and re-save the information as a .csv.
+
+```{r,  warning = FALSE, message = FALSE, error = FALSE}
+results_C5_screen <- enrich.C5_RFP_bonf@result
+
+results_C5_screen %>% write.csv("filepath/enrichment_results/enrich.C5_RFP_bonf.csv")
+```
+
+Next, the information needs to be parse out and the enrichment score calculated by category.
+
+```{r,  warning = FALSE, message = FALSE, error = FALSE}
+
+screen_enrichment <- results_C5_screen %>%
+     separate(BgRatio, into = c("size.term", "size.screen", sep = "/")) %>%
+     separate(GeneRatio, into = c("overlap.term", "size.sig", sep = "/")) %>%
+     mutate("hit.ratio" = as.numeric(overlap.term)/as.numeric(size.sig),
+          "screen.ratio" = as.numeric(size.term)/as.numeric(size.screen)) %>%
+     mutate("enrichment_score" = hit.ratio/screen.ratio) -> screen_enrichment
+```
+
+Finally, the results can be plotted for visualization.
+
+```{r,  warning = FALSE, message = FALSE, error = FALSE}
+df_BP <- screen_enrichment %>% filter(grepl("GOBP", ID), p.adjust <= 0.005) %>%
+  mutate(ID = str_remove(ID, "^GOBP_"))%>%
+  mutate(ID = str_replace_all(ID, "_", " "))
+BP <- ggplot(df_BP) +
+          geom_point(aes(
+          x = enrichment_score,
+          y = reorder(ID, pvalue),
+          color = pvalue),
+          size = 5) +
+     #xlim(0,2) +
+     xlab("enrichment score") +
+     ylab("") +
+     scale_color_gradient2(low = "#159a81", mid = "#fca509", high = "#910000",breaks=c(0,0.15,0.3), midpoint = 0.2,labels=c(""," ",""),limits=c(0,0.4)) +
+     theme_classic() + 
+     theme(
+          axis.text.y = 
+               element_text(size = 8),
+          axis.text.x = 
+               element_text(size = 8)) +
+          geom_text(aes(
+               x = 0,
+               y = ID,
+               label = paste(format(pvalue, digits = 2))), nudge_x = 0.2, size = 3) +
+     ggtitle("","GOBP")
+
+
+df_CC <- screen_enrichment %>% filter(grepl("GOCC", ID), p.adjust <= 0.005) %>%
+  mutate(ID = str_remove(ID, "^GOCC_"))%>%
+  mutate(ID = str_replace_all(ID, "_", " "))
+CC <- ggplot(df_CC) +
+          geom_point(aes(
+          x = enrichment_score,
+          y = reorder(ID, pvalue),
+          color = pvalue),
+          size = 5) +
+     #xlim(0,2) +
+     xlab("enrichment score") +
+     ylab("") +
+     scale_color_gradient2(low = "#159a81", mid = "#fca509", high = "#910000",breaks=c(0,0.15,0.3), midpoint = 0.2,labels=c(""," ",""),limits=c(0,0.4)) +
+     theme_classic() + 
+     theme(
+          axis.text.y = 
+               element_text(size = 8),
+          axis.text.x = 
+               element_text(size = 8)) +
+          geom_text(aes(
+               x = 0,
+               y = ID,
+               label = paste(format(pvalue, digits = 2))), nudge_x = 0.2, size = 3) +
+     ggtitle("","GOCC")
+
+df_MF <- screen_enrichment %>% filter(grepl("GOMF", ID), p.adjust <= 0.005) %>%
+  mutate(ID = str_remove(ID, "^GOMF_"))%>%
+  mutate(ID = str_replace_all(ID, "_", " "))
+
+MF <- ggplot(df_MF) +
+          geom_point(aes(
+          x = enrichment_score,
+          y = reorder(ID, pvalue),
+          color = pvalue),
+          size = 5) +
+     #xlim(0,2) +
+     xlab("enrichment score") +
+     ylab("") +
+     scale_color_gradient2(low = "#159a81", mid = "#fca509", high = "#910000",breaks=c(0,0.15,0.3), midpoint = 0.2,labels=c(""," ",""),limits=c(0,0.4)) +
+     theme_classic() + 
+     theme(
+          axis.text.y = 
+               element_text(size = 8),
+          axis.text.x = 
+               element_text(size = 8)) +
+          geom_text(aes(
+               x = 0,
+               y = ID,
+               label = paste(format(pvalue, digits = 2))), nudge_x = 0.2, size = 3) +
+     ggtitle("","GOMF")
+
+bonf <- as_tibble(read.csv("processed_data/enrichment_results/enrichment_bonf.csv"))
+df <- bonf %>% filter(test == "results_targeted_RFP" )
+
+a <- ggplot(df) +
+          geom_point(aes(
+          x = enrichment_score,
+          y = reorder(ID, pvalue),
+          color = pvalue),
+          size = 5) +
+     xlim(0,2) +
+     xlab("enrichment score") +
+     ylab("") +
+     scale_color_gradient2(low = "#159a81", mid = "#fca509", high = "#910000",breaks=c(0,0.15,0.3), midpoint = 0.2,labels=c(""," ",""),limits=c(0,0.3)) +
+     theme_classic() + 
+     theme(
+          axis.text.y = 
+               element_text(size = 8),
+          axis.text.x = 
+               element_text(size = 8)) +
+               scale_color_gradient2(low = "#159a81", mid = "#fca509", high = "#910000",breaks=c(0,0.5,1), midpoint = 0.2,labels=c(""," ",""),limits=c(0,1)) +
+     theme_classic() + 
+     theme(legend.position = "none",
+          axis.text.y = 
+               element_text(size = 8),
+          axis.text.x = 
+               element_text(size = 8)) +
+          geom_text(aes(
+               x = 0,
+               y = ID,
+               label = paste(format(pvalue, digits = 2))), nudge_x = 0.2, size = 3) +
+     ggtitle("","")
+```

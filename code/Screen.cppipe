@@ -1,0 +1,516 @@
+CellProfiler Pipeline: http://www.cellprofiler.org
+Version:5
+DateRevision:424
+GitHash:
+ModuleCount:35
+HasImagePlaneDetails:False
+
+Images:[module_num:1|svn_version:'Unknown'|variable_revision_number:2|show_window:False|notes:['Optimized for HatchScreen1 November HatchScreen1 110122 21st Images', 'Note: NO WGA ', 'Using 090122 background images for now', '', '', '']|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
+    :
+    Filter images?:Images only
+    Select the rule criteria:and (file does contain ".TIF")
+
+Metadata:[module_num:2|svn_version:'Unknown'|variable_revision_number:6|show_window:False|notes:['In this module images are associated with user defined metadata through the use of regular expressions.', '', 'All images need to a value in all categories']|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
+    Extract metadata?:Yes
+    Metadata data type:Text
+    Metadata types:{}
+    Extraction method count:1
+    Metadata extraction method:Extract from file/folder names
+    Metadata source:File name
+    Regular expression to extract from file name:.*_(?P<Well>.*)_s(?P<Site>.*)_w(?P<Channel>[0-9]).TIF
+    Regular expression to extract from folder name:(?P<Date>[0-9]{4}_[0-9]{2}_[0-9]{2})$
+    Extract metadata from:All images
+    Select the filtering criteria:and (file does contain "")
+    Metadata file location:Elsewhere...|
+    Match file and image metadata:[]
+    Use case insensitive matching?:No
+    Metadata file name:None
+    Does cached metadata exist?:No
+
+NamesAndTypes:[module_num:3|svn_version:'Unknown'|variable_revision_number:8|show_window:False|notes:['This module groups individual .tif s into image sets.', '', '- For all named images, change "Set intensity range from" to "Image bit-depth." Now the raw intensity values can be obtained from the CP values by multiplying by the image bit depth (e.g 255 for 8-bit, 65,535 for 16-bit', '', '- Each channel is then given its own name based on the metadata "Channel" value.', '', '- At the bottom of the module is a button to "add a single image". Use this to add the masking images to all of the image sets from the run. These images must be included in the list of images in the Images module. ', '', 'If the .tif association is incorrect, change "Image set matching method" from "order" to "metadata" and scroll through menu to "Site" for all channesl.']|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
+    Assign a name to:Images matching rules
+    Select the image type:Grayscale image
+    Name to assign these images:DNA
+    Match metadata:[]
+    Image set matching method:Order
+    Set intensity range from:Image metadata
+    Assignments count:3
+    Single images count:3
+    Maximum intensity:255.0
+    Process as 3D?:No
+    Relative pixel spacing in X:1.0
+    Relative pixel spacing in Y:1.0
+    Relative pixel spacing in Z:1.0
+    Select the rule criteria:and (metadata does Channel "3")
+    Name to assign these images:DNA
+    Name to assign these objects:Cell
+    Select the image type:Grayscale image
+    Set intensity range from:Image bit-depth
+    Maximum intensity:255.0
+    Select the rule criteria:and (metadata does Channel "2")
+    Name to assign these images:GFP
+    Name to assign these objects:Nucleus
+    Select the image type:Grayscale image
+    Set intensity range from:Image bit-depth
+    Maximum intensity:255.0
+    Select the rule criteria:and (metadata does Channel "1")
+    Name to assign these images:DsRed
+    Name to assign these objects:Cytoplasm
+    Select the image type:Grayscale image
+    Set intensity range from:Image bit-depth
+    Maximum intensity:255.0
+    Single image location:file:/Volumes/hatch_e/hatchlab/Leica_SD/Amanda/032323_219_HatchScreen2_35nM48h/032323_MASK__A01_s1_w1.TIF   
+    Name to assign this image:Mask_DsRed
+    Name to assign these objects:Object2
+    Select the image type:Grayscale image
+    Set intensity range from:Image metadata
+    Maximum intensity:255.0
+    Single image location:file:/Volumes/hatch_e/hatchlab/Leica_SD/Amanda/032323_219_HatchScreen2_35nM48h/032323_MASK__A01_s1_w2.TIF   
+    Name to assign this image:Mask_GFP
+    Name to assign these objects:Object3
+    Select the image type:Grayscale image
+    Set intensity range from:Image metadata
+    Maximum intensity:255.0
+    Single image location:file:/Volumes/hatch_e/hatchlab/Leica_SD/Amanda/032323_219_HatchScreen2_35nM48h/032323_MASK__A01_s1_w3.TIF   
+    Name to assign this image:Mask_DAPI
+    Name to assign these objects:Object4
+    Select the image type:Grayscale image
+    Set intensity range from:Image metadata
+    Maximum intensity:255.0
+
+Groups:[module_num:4|svn_version:'Unknown'|variable_revision_number:2|show_window:False|notes:['For multichannel image processing on the cluster, need to use this module or else all image sets will be grouped together.', '', 'In this pipeline, grouping the image sets by site tells the computer to process the image as 10 groups rather than 1 group of 10 image sets.']|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
+    Do you want to group your images?:Yes
+    grouping metadata count:1
+    Metadata category:Well
+
+CorrectIlluminationApply:[module_num:5|svn_version:'Unknown'|variable_revision_number:5|show_window:False|notes:['Step 1', 'Subtract background using blank images from the same microscope/object/laser settings']|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
+    Select the input image:DNA
+    Name the output image:CorrDAPI
+    Select the illumination function:Mask_DAPI
+    Select how the illumination function is applied:Subtract
+    Select the input image:GFP
+    Name the output image:CorrGFP
+    Select the illumination function:Mask_GFP
+    Select how the illumination function is applied:Subtract
+    Select the input image:DsRed
+    Name the output image:CorrRFP
+    Select the illumination function:Mask_DsRed
+    Select how the illumination function is applied:Subtract
+    Set output image values less than 0 equal to 0?:Yes
+    Set output image values greater than 1 equal to 1?:Yes
+
+RescaleIntensity:[module_num:6|svn_version:'Unknown'|variable_revision_number:3|show_window:False|notes:[]|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
+    Select the input image:CorrRFP
+    Name the output image:RescaleRFP
+    Rescaling method:Stretch each image to use the full intensity range
+    Method to calculate the minimum intensity:Custom
+    Method to calculate the maximum intensity:Custom
+    Lower intensity limit for the input image:0.0
+    Upper intensity limit for the input image:1.0
+    Intensity range for the input image:0.0,1.0
+    Intensity range for the output image:0.0,1.0
+    Select image to match in maximum intensity:None
+    Divisor value:1.0
+    Divisor measurement:None
+
+RescaleIntensity:[module_num:7|svn_version:'Unknown'|variable_revision_number:3|show_window:False|notes:[]|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
+    Select the input image:CorrGFP
+    Name the output image:RescaleGFP
+    Rescaling method:Stretch each image to use the full intensity range
+    Method to calculate the minimum intensity:Custom
+    Method to calculate the maximum intensity:Custom
+    Lower intensity limit for the input image:0.0
+    Upper intensity limit for the input image:1.0
+    Intensity range for the input image:0.0,1.0
+    Intensity range for the output image:0.0,1.0
+    Select image to match in maximum intensity:None
+    Divisor value:1.0
+    Divisor measurement:None
+
+RescaleIntensity:[module_num:8|svn_version:'Unknown'|variable_revision_number:3|show_window:False|notes:[]|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
+    Select the input image:CorrDAPI
+    Name the output image:RescaleDNA
+    Rescaling method:Stretch each image to use the full intensity range
+    Method to calculate the minimum intensity:Custom
+    Method to calculate the maximum intensity:Custom
+    Lower intensity limit for the input image:0.0
+    Upper intensity limit for the input image:1.0
+    Intensity range for the input image:0.0,1.0
+    Intensity range for the output image:0.0,1.0
+    Select image to match in maximum intensity:None
+    Divisor value:1.0
+    Divisor measurement:None
+
+Resize:[module_num:9|svn_version:'Unknown'|variable_revision_number:5|show_window:False|notes:['Step2', '', 'Downsampling the image increases processing speed and removes background. ', 'This is a good option when the objects of interest are large enough to retain their shape when shrunken.', '', 'Here the image is being downsampled by a factor of 2.']|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
+    Select the input image:RescaleDNA
+    Name the output image:ResizeDNA1
+    Resizing method:Resize by a fraction or multiple of the original size
+    X Resizing factor:.5
+    Y Resizing factor:.5
+    Z Resizing factor:1.0
+    Width (x) of the final image:100
+    Height (y) of the final image:100
+    # of planes (z) in the final image:10
+    Interpolation method:Nearest Neighbor
+    Method to specify the dimensions:Manual
+    Select the image with the desired dimensions:None
+    Additional image count:0
+
+Resize:[module_num:10|svn_version:'Unknown'|variable_revision_number:5|show_window:False|notes:[]|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
+    Select the input image:RescaleRFP
+    Name the output image:ResizeRFP
+    Resizing method:Resize by a fraction or multiple of the original size
+    X Resizing factor:.5
+    Y Resizing factor:.5
+    Z Resizing factor:1.0
+    Width (x) of the final image:100
+    Height (y) of the final image:100
+    # of planes (z) in the final image:10
+    Interpolation method:Nearest Neighbor
+    Method to specify the dimensions:Manual
+    Select the image with the desired dimensions:None
+    Additional image count:0
+
+Smooth:[module_num:11|svn_version:'Unknown'|variable_revision_number:2|show_window:False|notes:['Step3', 'Diameter = 8', '']|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
+    Select the input image:ResizeRFP
+    Name the output image:Smooth_RFP
+    Select smoothing method:Median Filter
+    Calculate artifact diameter automatically?:No
+    Typical artifact diameter:4
+    Edge intensity difference:0.1
+    Clip intensities to 0 and 1?:Yes
+
+Resize:[module_num:12|svn_version:'Unknown'|variable_revision_number:5|show_window:False|notes:[]|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
+    Select the input image:Smooth_RFP
+    Name the output image:SmoothRFP_Final
+    Resizing method:Resize by a fraction or multiple of the original size
+    X Resizing factor:2
+    Y Resizing factor:2
+    Z Resizing factor:1.0
+    Width (x) of the final image:100
+    Height (y) of the final image:100
+    # of planes (z) in the final image:10
+    Interpolation method:Nearest Neighbor
+    Method to specify the dimensions:Manual
+    Select the image with the desired dimensions:None
+    Additional image count:0
+
+Smooth:[module_num:13|svn_version:'Unknown'|variable_revision_number:2|show_window:False|notes:[]|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
+    Select the input image:ResizeDNA1
+    Name the output image:Smooth_DNA1
+    Select smoothing method:Median Filter
+    Calculate artifact diameter automatically?:No
+    Typical artifact diameter:10
+    Edge intensity difference:0.1
+    Clip intensities to 0 and 1?:Yes
+
+IdentifyPrimaryObjects:[module_num:14|svn_version:'Unknown'|variable_revision_number:15|show_window:False|notes:['Step4', 'Segment the nuclei', '']|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
+    Select the input image:Smooth_DNA1
+    Name the primary objects to be identified:DNA_Objects1
+    Typical diameter of objects, in pixel units (Min,Max):10,120
+    Discard objects outside the diameter range?:No
+    Discard objects touching the border of the image?:No
+    Method to distinguish clumped objects:Shape
+    Method to draw dividing lines between clumped objects:Shape
+    Size of smoothing filter:5
+    Suppress local maxima that are closer than this minimum allowed distance:20
+    Speed up by using lower-resolution image to find local maxima?:Yes
+    Fill holes in identified objects?:After both thresholding and declumping
+    Automatically calculate size of smoothing filter for declumping?:Yes
+    Automatically calculate minimum allowed distance between local maxima?:No
+    Handling of objects if excessive number of objects identified:Erase
+    Maximum number of objects:100
+    Use advanced settings?:Yes
+    Threshold setting version:12
+    Threshold strategy:Adaptive
+    Thresholding method:Otsu
+    Threshold smoothing scale:.02
+    Threshold correction factor:1.5
+    Lower and upper bounds on threshold:0.01,.95
+    Manual threshold:0.0
+    Select the measurement to threshold with:None
+    Two-class or three-class thresholding?:Two classes
+    Log transform before thresholding?:No
+    Assign pixels in the middle intensity class to the foreground or the background?:Background
+    Size of adaptive window:160
+    Lower outlier fraction:0.05
+    Upper outlier fraction:0.05
+    Averaging method:Mean
+    Variance method:Standard deviation
+    # of deviations:2.0
+    Thresholding method:Otsu
+
+FillObjects:[module_num:15|svn_version:'Unknown'|variable_revision_number:2|show_window:False|notes:['Step5']|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
+    Select the input object:DNA_Objects1
+    Name the output object:DNA_FillObjects1
+    Minimum hole size:25
+    Planewise fill:No
+    Filling method:Holes
+
+ResizeObjects:[module_num:16|svn_version:'Unknown'|variable_revision_number:3|show_window:False|notes:['Step6, final nucleus segmentation ', '', 'Undoes the downsampling to facilitate filtering steps', '']|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
+    Select the input object:DNA_FillObjects1
+    Name the output object:DNA_Final1
+    Method:Factor
+    X Factor:2
+    Y Factor:2
+    Z Factor:1.0
+    Width (X):100
+    Height (Y):100
+    Planes (Z):10
+    Select the image with the desired dimensions:None
+
+ResizeObjects:[module_num:17|svn_version:'Unknown'|variable_revision_number:3|show_window:False|notes:['Step7', '', 'Shrink nuclei to combine with small WGA image to identify cells.']|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
+    Select the input object:DNA_Final1
+    Name the output object:SmallDNA1
+    Method:Factor
+    X Factor:0.5
+    Y Factor:0.5
+    Z Factor:1.0
+    Width (X):100
+    Height (Y):100
+    Planes (Z):10
+    Select the image with the desired dimensions:None
+
+IdentifySecondaryObjects:[module_num:18|svn_version:'Unknown'|variable_revision_number:10|show_window:True|notes:['Step 10', 'Segment the cells.']|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
+    Select the input objects:DNA_Final1
+    Name the objects to be identified:Cyto1
+    Select the method to identify the secondary objects:Propagation
+    Select the input image:SmoothRFP_Final
+    Number of pixels by which to expand the primary objects:10
+    Regularization factor:0.04
+    Discard secondary objects touching the border of the image?:No
+    Discard the associated primary objects?:No
+    Name the new primary objects:FilteredNuclei
+    Fill holes in identified objects?:Yes
+    Threshold setting version:12
+    Threshold strategy:Global
+    Thresholding method:Otsu
+    Threshold smoothing scale:.1
+    Threshold correction factor:.8
+    Lower and upper bounds on threshold:0.01,.99
+    Manual threshold:0.0
+    Select the measurement to threshold with:None
+    Two-class or three-class thresholding?:Two classes
+    Log transform before thresholding?:No
+    Assign pixels in the middle intensity class to the foreground or the background?:Foreground
+    Size of adaptive window:50
+    Lower outlier fraction:0.05
+    Upper outlier fraction:0.05
+    Averaging method:Mean
+    Variance method:Standard deviation
+    # of deviations:2.0
+    Thresholding method:Otsu
+
+ExpandOrShrinkObjects:[module_num:19|svn_version:'Unknown'|variable_revision_number:2|show_window:False|notes:[]|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
+    Select the input objects:Cyto1
+    Name the output objects:Cyto2
+    Select the operation:Shrink objects by a specified number of pixels
+    Number of pixels by which to expand or shrink:8
+    Fill holes in objects so that all objects shrink to a single point?:No
+    Expand or shrink measurement:None
+
+ResizeObjects:[module_num:20|svn_version:'Unknown'|variable_revision_number:3|show_window:False|notes:['Step 11', '', 'Resize cells to original object size.']|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
+    Select the input object:Cyto2
+    Name the output object:Cyto_Objects1
+    Method:Factor
+    X Factor:1
+    Y Factor:1
+    Z Factor:1.0
+    Width (X):100
+    Height (Y):100
+    Planes (Z):10
+    Select the image with the desired dimensions:None
+
+RelateObjects:[module_num:21|svn_version:'Unknown'|variable_revision_number:5|show_window:False|notes:['Step12', 'This module relabels the nuclei objects based on whether the cell object was kept after filtering. These will be the nuclei used to identify the cytoplasm and to measure final shape/intensities.']|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
+    Parent objects:DNA_Final1
+    Child objects:Cyto2
+    Calculate child-parent distances?:None
+    Calculate per-parent means for all child measurements?:No
+    Calculate distances to other parents?:No
+    Do you want to save the children with parents as a new object set?:Yes
+    Name the output object:Cyto_Final1
+    Parent name:None
+
+IdentifyTertiaryObjects:[module_num:22|svn_version:'Unknown'|variable_revision_number:3|show_window:False|notes:['Step 17 Segment cytoplasm', '', 'Simple object subtraction to segment the cytoplasm. This cytoplasm will be the object used to analyze intensity.', '']|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
+    Select the larger identified objects:Cyto_Objects1
+    Select the smaller identified objects:DNA_Final1
+    Name the tertiary objects to be identified:Cyto_Object_Image
+    Shrink smaller object prior to subtraction?:Yes
+
+OverlayOutlines:[module_num:23|svn_version:'Unknown'|variable_revision_number:4|show_window:False|notes:[]|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
+    Display outlines on a blank image?:No
+    Select image on which to display outlines:SmoothRFP_Final
+    Name the output image:OrigOverlay
+    Outline display mode:Color
+    Select method to determine brightness of outlines:Max of image
+    How to outline:Inner
+    Select outline color:#800080
+    Select objects to display:Cyto_Object_Image
+    Select outline color:#21FFFF
+    Select objects to display:DNA_Final1
+
+DisplayDataOnImage:[module_num:24|svn_version:'Unknown'|variable_revision_number:6|show_window:False|notes:[]|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
+    Display object or image measurements?:Object
+    Select the input objects:DNA_Final1
+    Measurement to display:Number_Object_Number
+    Select the image on which to display the measurements:OrigOverlay
+    Text color:#21FFFF
+    Name the output image that has the measurements displayed:DisplayImage
+    Font size (points):16
+    Number of decimals:0
+    Image elements to save:Image
+    Annotation offset (in pixels):0
+    Display mode:Text
+    Color map:Default
+    Display background image?:Yes
+    Color map scale:Use this image's measurement range
+    Color map range:0.0,1.0
+    Font:.Aqua Kana
+    Use scientific notation?:No
+    Font weight:bold
+
+Tile:[module_num:25|svn_version:'Unknown'|variable_revision_number:1|show_window:False|notes:[]|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
+    Select an input image:SmoothRFP_Final
+    Name the output image:TiledImage
+    Tile assembly method:Within cycles
+    Final number of rows:1
+    Final number of columns:3
+    Image corner to begin tiling:top left
+    Direction to begin tiling:row
+    Use meander mode?:No
+    Automatically calculate number of rows?:No
+    Automatically calculate number of columns?:No
+    Select an additional image to tile:OrigOverlay
+    Select an additional image to tile:DisplayImage
+
+SaveImages:[module_num:26|svn_version:'Unknown'|variable_revision_number:16|show_window:False|notes:[]|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
+    Select the type of image to save:Image
+    Select the image to save:TiledImage
+    Select method for constructing file names:From image filename
+    Select image name for file prefix:DsRed
+    Enter single file name:OrigBlue
+    Number of digits:4
+    Append a suffix to the image file name?:No
+    Text to append to the image name:
+    Saved file format:tiff
+    Output file location:Default Output Folder|
+    Image bit depth:8-bit integer
+    Overwrite existing files without warning?:Yes
+    When to save:Every cycle
+    Record the file and path information to the saved image?:No
+    Create subfolders in the output folder?:No
+    Base image folder:Default Output Folder sub-folder|Image_Output
+    How to save the series:T (Time)
+    Save with lossless compression?:Yes
+
+ExpandOrShrinkObjects:[module_num:27|svn_version:'Unknown'|variable_revision_number:2|show_window:False|notes:[]|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
+    Select the input objects:DNA_Final1
+    Name the output objects:DNA_XL
+    Select the operation:Expand objects by a specified number of pixels
+    Number of pixels by which to expand or shrink:5
+    Fill holes in objects so that all objects shrink to a single point?:No
+    Expand or shrink measurement:None
+
+ExpandOrShrinkObjects:[module_num:28|svn_version:'Unknown'|variable_revision_number:2|show_window:False|notes:[]|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
+    Select the input objects:DNA_Final1
+    Name the output objects:DNA_Object_Measure
+    Select the operation:Shrink objects by a specified number of pixels
+    Number of pixels by which to expand or shrink:5
+    Fill holes in objects so that all objects shrink to a single point?:No
+    Expand or shrink measurement:None
+
+IdentifyTertiaryObjects:[module_num:29|svn_version:'Unknown'|variable_revision_number:3|show_window:False|notes:[]|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
+    Select the larger identified objects:Cyto_Object_Image
+    Select the smaller identified objects:DNA_XL
+    Name the tertiary objects to be identified:Cyto_Object_Measure
+    Shrink smaller object prior to subtraction?:Yes
+
+OverlayOutlines:[module_num:30|svn_version:'Unknown'|variable_revision_number:4|show_window:False|notes:[]|batch_state:array([], dtype=uint8)|enabled:False|wants_pause:False]
+    Display outlines on a blank image?:No
+    Select image on which to display outlines:CorrRFP
+    Name the output image:OrigOverlayTesting
+    Outline display mode:Color
+    Select method to determine brightness of outlines:Max of image
+    How to outline:Inner
+    Select outline color:#FF0000
+    Select objects to display:Cyto_Object_Measure
+    Select outline color:Green
+    Select objects to display:DNA_Object_Measure
+
+Tile:[module_num:31|svn_version:'Unknown'|variable_revision_number:1|show_window:False|notes:[]|batch_state:array([], dtype=uint8)|enabled:False|wants_pause:False]
+    Select an input image:CorrRFP
+    Name the output image:TiledImageTesting
+    Tile assembly method:Within cycles
+    Final number of rows:1
+    Final number of columns:2
+    Image corner to begin tiling:top left
+    Direction to begin tiling:row
+    Use meander mode?:No
+    Automatically calculate number of rows?:No
+    Automatically calculate number of columns?:No
+    Select an additional image to tile:OrigOverlayTesting
+
+SaveImages:[module_num:32|svn_version:'Unknown'|variable_revision_number:16|show_window:False|notes:[]|batch_state:array([], dtype=uint8)|enabled:False|wants_pause:False]
+    Select the type of image to save:Image
+    Select the image to save:TiledImageTesting
+    Select method for constructing file names:Sequential numbers
+    Select image name for file prefix:DNA
+    Enter file prefix:OrigBlue
+    Number of digits:4
+    Append a suffix to the image file name?:No
+    Text to append to the image name:
+    Saved file format:tiff
+    Output file location:Default Output Folder|
+    Image bit depth:8-bit integer
+    Overwrite existing files without warning?:No
+    When to save:Every cycle
+    Record the file and path information to the saved image?:No
+    Create subfolders in the output folder?:No
+    Base image folder:Elsewhere...|
+    How to save the series:T (Time)
+    Save with lossless compression?:Yes
+
+MeasureObjectIntensity:[module_num:33|svn_version:'Unknown'|variable_revision_number:4|show_window:False|notes:[]|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
+    Select images to measure:CorrDAPI, CorrGFP, CorrRFP
+    Select objects to measure:Cyto_Object_Measure, DNA_Object_Measure
+
+MeasureObjectSizeShape:[module_num:34|svn_version:'Unknown'|variable_revision_number:3|show_window:False|notes:[]|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
+    Select object sets to measure:Cyto_Object_Image, DNA_Final1
+    Calculate the Zernike features?:No
+    Calculate the advanced features?:No
+
+ExportToSpreadsheet:[module_num:35|svn_version:'Unknown'|variable_revision_number:13|show_window:False|notes:[]|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
+    Select the column delimiter:Comma (",")
+    Add image metadata columns to your object data file?:Yes
+    Add image file and folder names to your object data file?:Yes
+    Select the measurements to export:Yes
+    Calculate the per-image mean values for object measurements?:No
+    Calculate the per-image median values for object measurements?:No
+    Calculate the per-image standard deviation values for object measurements?:No
+    Output file location:Default Output Folder|
+    Create a GenePattern GCT file?:No
+    Select source of sample row name:Metadata
+    Select the image to use as the identifier:None
+    Select the metadata to use as the identifier:None
+    Export all measurement types?:No
+    Press button to select measurements:DNA_Object_Measure|Intensity_MeanIntensity_CorrGFP,DNA_Object_Measure|Intensity_MeanIntensity_CorrRFP,DNA_Object_Measure|Intensity_MeanIntensity_CorrDAPI,Cyto_Object_Measure|Intensity_MeanIntensity_CorrDAPI,Cyto_Object_Measure|Intensity_MeanIntensity_CorrGFP,Cyto_Object_Measure|Intensity_MeanIntensity_CorrRFP,Cyto_Object_Image|AreaShape_Area,DNA_Final1|AreaShape_Orientation,DNA_Final1|AreaShape_Eccentricity,DNA_Final1|AreaShape_ConvexArea,DNA_Final1|AreaShape_Area,DNA_Final1|AreaShape_Solidity
+    Representation of Nan/Inf:NaN
+    Add a prefix to file names?:Yes
+    Filename prefix:032323_
+    Overwrite existing files without warning?:Yes
+    Data to export:DNA_Final1
+    Combine these object measurements with those of the previous object?:No
+    File name:DATA.csv
+    Use the object name for the file name?:Yes
+    Data to export:DNA_Object_Measure
+    Combine these object measurements with those of the previous object?:Yes
+    File name:DATA.csv
+    Use the object name for the file name?:Yes
+    Data to export:Cyto_Object_Image
+    Combine these object measurements with those of the previous object?:Yes
+    File name:DATA.csv
+    Use the object name for the file name?:Yes
+    Data to export:Cyto_Object_Measure
+    Combine these object measurements with those of the previous object?:Yes
+    File name:DATA.csv
+    Use the object name for the file name?:Yes
